@@ -1,0 +1,12 @@
+*.gem
+*.rbc
+.bundle
+Gemfile
+Gemfile.lock
+tmp
+.rvmrc
+.rbenv-version
+.ruby-version
+.DS_Store
+.kitchen/
+.kitchen.local.yml

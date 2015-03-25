@@ -1,0 +1,14 @@
+---
+driver:
+  name: vagrant
+
+provisioner:
+  name: shell
+  data_path: bin
+
+platforms:
+  - name: ubuntu-14.04
+  - name: windows-2012r2-core
+
+suites:
+  - name: default
