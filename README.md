@@ -43,7 +43,7 @@ sudo appbundle-updater chef ohai master
 Windows users from PowerShell use the bat file:
 
 ```powershell
-& appbundle-updater.bat chefdk test-kitchen master
+& appbundle-updater chefdk test-kitchen master
 ```
 
 If you don't want "master" you can use any other git tag/branch/sha/etc that git understands.
