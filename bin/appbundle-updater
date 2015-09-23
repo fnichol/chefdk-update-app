@@ -20,6 +20,24 @@
 require "pathname"
 require "optparse"
 
+# FIXME: move to helpers mixin
+
+def windows?
+  @windows ||= RUBY_PLATFORM =~ /mswin|mingw|windows/
+end
+
+def chefdk
+  if windows?
+    Pathname.new(File.join(ENV["SYSTEMDRIVE"], "opscode", ARGV[0]))
+  else
+    Pathname.new(File.join("/opt", ARGV[0]))
+  end
+end
+
+def bin_dir
+  chefdk.join("embedded/bin")
+end
+
 App = Struct.new(:name, :url, :bundle_without, :install_command) do
   def to_s
     name
@@ -31,43 +49,43 @@ CHEFDK_APPS = [
     "berkshelf",
     "https://github.com/berkshelf/berkshelf.git",
     "guard test",
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "chef",
     "https://github.com/chef/chef.git",
     "server docgen test development",
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "chef-dk",
     "https://github.com/chef/chef-dk.git",
     "dev test development",
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "chef-vault",
     "https://github.com/Nordstrom/chef-vault.git",
     "test",
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "foodcritic",
     "https://github.com/acrmp/foodcritic.git",
     nil,
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "ohai",
     "https://github.com/chef/ohai.git",
     "test development",
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "test-kitchen",
     "https://github.com/test-kitchen/test-kitchen.git",
     "guard test",
-    "rake install",
+    "#{bin_dir.join("rake")} install",
   )
 ].freeze
 
@@ -84,6 +102,7 @@ class Updater
       abort "#{$0} needs to be run as root user or with sudo"
     end
 
+    ruby("-rpp -e 'pp ENV'")
     banner("Cleaning #{app} checkout")
     app_dir.rmtree if app_dir.directory?
 
@@ -117,7 +136,7 @@ class Updater
 
   private
   ENV_KEYS = %w[
-    BUNDLE_BIN_PATH BUNDLE_GEMFILE GEM_HOME GEM_PATH GEM_ROOT RUBYLIB RUBYOPT RUBY_ENGINE RUBY_ROOT RUBY_VERSION _ORIGINAL_GEM_PATH
+    BUNDLE_BIN_PATH BUNDLE_GEMFILE GEM_HOME GEM_PATH GEM_ROOT IRBRC MY_RUBY_HOME RUBYLIB RUBYOPT RUBY_ENGINE RUBY_ROOT RUBY_VERSION _ORIGINAL_GEM_PATH PATH
   ].freeze
 
   def app_dir
@@ -128,10 +147,6 @@ class Updater
     puts "-----> #{msg}"
   end
 
-  def bin_dir
-    chefdk.join("embedded/bin")
-  end
-
   def ruby(script)
     ruby = bin_dir.join("ruby").to_s.tap { |p| p.concat(".exe") if windows? }
 
@@ -140,22 +155,12 @@ class Updater
 
   def run(cmd)
     ENV_KEYS.each { |key| ENV["_YOLO_#{key}"] = ENV[key]; ENV.delete(key) }
+    ENV['PATH'] = "#{bin_dir}:#{ENV['_YOLO_PATH']}"
+    puts "    running: #{cmd}"
     system(cmd) or raise("Command [#{cmd}] failed!")
     ENV_KEYS.each { |key| ENV[key] = ENV.delete("_YOLO_#{key}") }
   end
 
-end
-
-def windows?
-  @windows ||= RUBY_PLATFORM =~ /mswin|mingw|windows/
-end
-
-def chefdk
-  if windows?
-    Pathname.new(File.join(ENV["SYSTEMDRIVE"], "opscode", ARGV[0]))
-  else
-    Pathname.new(File.join("/opt", ARGV[0]))
-  end
 end
 
 class CLI
