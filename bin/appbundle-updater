@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+
+exec "/opt/$1/embedded/bin/ruby" "`dirname $0`/appbundle-updater.rb" "$@"

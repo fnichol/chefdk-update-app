@@ -20,7 +20,7 @@
 require "pathname"
 require "optparse"
 
-App = Struct.new(:name, :url, :bundle_without) do
+App = Struct.new(:name, :url, :bundle_without, :install_command) do
   def to_s
     name
   end
@@ -30,37 +30,44 @@ CHEFDK_APPS = [
   App.new(
     "berkshelf",
     "https://github.com/berkshelf/berkshelf.git",
-    "guard test development"
+    "guard test",
+    "rake install",
   ),
   App.new(
     "chef",
     "https://github.com/chef/chef.git",
-    "server docgen test development"
+    "server docgen test development",
+    "rake install",
   ),
   App.new(
     "chef-dk",
     "https://github.com/chef/chef-dk.git",
-    "dev test development"
+    "dev test development",
+    "rake install",
   ),
   App.new(
     "chef-vault",
     "https://github.com/Nordstrom/chef-vault.git",
-    "test development"
+    "test",
+    "rake install",
   ),
   App.new(
     "foodcritic",
     "https://github.com/acrmp/foodcritic.git",
-    "test development"
+    nil,
+    "rake install",
   ),
   App.new(
     "ohai",
     "https://github.com/chef/ohai.git",
-    "test development"
+    "test development",
+    "rake install",
   ),
   App.new(
     "test-kitchen",
     "https://github.com/test-kitchen/test-kitchen.git",
-    "guard test development"
+    "guard test",
+    "rake install",
   )
 ].freeze
 
@@ -90,7 +97,14 @@ class Updater
 
     banner("Installing dependencies")
     Dir.chdir(app_dir) do
-      ruby("#{bin_dir.join("bundle")} install --without #{app.bundle_without}")
+      cmd = "#{bin_dir.join("bundle")} install"
+      cmd += " --without #{app.bundle_without}" if app.bundle_without
+      ruby(cmd)
+    end
+
+    banner("Installing gem")
+    Dir.chdir(app_dir) do
+      ruby("#{bin_dir.join("bundle")} exec #{app.install_command}")
     end
 
     banner("Updating appbundler binstubs for #{app}")
@@ -119,14 +133,6 @@ class Updater
     chefdk.join("embedded/bin")
   end
 
-  def chefdk
-    if windows?
-      Pathname.new(File.join(ENV["SYSTEMDRIVE"], "opscode", "chefdk"))
-    else
-      Pathname.new("/opt/chefdk")
-    end
-  end
-
   def ruby(script)
     ruby = bin_dir.join("ruby").to_s.tap { |p| p.concat(".exe") if windows? }
 
@@ -139,8 +145,17 @@ class Updater
     ENV_KEYS.each { |key| ENV[key] = ENV.delete("_YOLO_#{key}") }
   end
 
-  def windows?
-    @windows ||= RUBY_PLATFORM =~ /mswin|mingw|windows/
+end
+
+def windows?
+  @windows ||= RUBY_PLATFORM =~ /mswin|mingw|windows/
+end
+
+def chefdk
+  if windows?
+    Pathname.new(File.join(ENV["SYSTEMDRIVE"], "opscode", ARGV[0]))
+  else
+    Pathname.new(File.join("/opt", ARGV[0]))
   end
 end
 
@@ -154,10 +169,7 @@ class CLI
   def initialize
     @options = Hash.new
     @parser = OptionParser.new { |opts|
-      opts.banner = "Usage: #{$0} APP_NAME [options]"
-      opts.on("-r REF", "--ref REF", "Git reference (branch, tag, sha, etc.)") do |r|
-        options[:ref] = r
-      end
+      opts.banner = "Usage: #{$0} PROJECT APP_NAME GIT_REF"
       opts.on("-h", "--help", "Prints this help") do
         puts opts
         exit
@@ -171,10 +183,10 @@ class CLI
   end
 
   def validate!
-    die("APP_NAME is required") if ARGV.empty?
-    options[:app] = CHEFDK_APPS.find { |a| a.name == ARGV.first }
-    die("Invalid APP_NAME: #{ARGV.first}") if options[:app].nil?
-    die("--ref flag is required") if options[:ref].nil?
+    die("PROJECT APP_NAME GIT_REF options are all required") if ARGV.length < 3
+    options[:app] = CHEFDK_APPS.find { |a| a.name == ARGV[1] }
+    die("Invalid APP_NAME: #{ARGV[1]}") if options[:app].nil?
+    options[:ref] = ARGV[2]
   end
 
   def die(msg)
