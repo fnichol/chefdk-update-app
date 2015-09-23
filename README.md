@@ -9,6 +9,12 @@ Helper to update Chef and Chef-DK appbundle'd apps inside of an omnibus bundle.
 
 ## Usage Examples
 
+Install as a gem:
+
+```
+gem install appbundle-updater
+```
+
 Updating chef in the /opt/chefdk bundle to master:
 
 ```
@@ -47,6 +53,22 @@ Windows users from PowerShell use the bat file:
 ```
 
 If you don't want "master" you can use any other git tag/branch/sha/etc that git understands.
+
+## Execution and Target rubies
+
+This does not need to be installed into the embedded ruby that you are doing the update on.
+
+You can install this into an rvm gemset as a local user (for example) and run:
+
+```
+rvmsudo appbundle-updater chef chef master
+```
+
+It will invoke appbundle-updater via rvm (using your user ruby+gemset under sudo), but will
+correctly break the bundle and setup the PATH in order to manipulate your /opt/chefdk or
+/opt/chef ruby environment.
+
+Only tested with RVM, but chruby and rbenv are usually simpler and easier.
 
 ## <a name="development"></a> Development
 
