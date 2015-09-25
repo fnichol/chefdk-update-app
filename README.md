@@ -1,53 +1,74 @@
-# chefdk-update-app
+# appbundle-updater
 
-A little help when you want to update an appbundled project inside [ChefDK](https://downloads.chef.io/chef-dk/).
+Helper to update Chef and Chef-DK appbundle'd apps inside of an omnibus bundle.
 
 ## Requirements
 
-* You need to have a pre-existing ChefDK installation in either `/opt/chefdk` (for Unix-like distros) or `%SYSTEMDRIVE%\opscode\chefdk` (for Windows distros).
+* A ChefDK or Chef Client installation in the standard location.
 * You need to have the `git` command in your PATH.
-* You need patience if this doesn't work out of the box every time :)
 
-## Usage
+## Usage Examples
 
-Clone this repository with and enter the project directory:
+Install as a gem:
 
-```sh
-git clone https://github.com/fnichol/chefdk-update-app.git
-cd chefdk-update-app
+```
+gem install appbundle-updater
 ```
 
-Choose a ChefDK "app" to update. If you don't need a list of options, run the help command.
+Updating chef in the /opt/chefdk bundle to master:
 
-For Unix distros:
-
-```sh
-./bin/chefdk-update-app.sh --help
+```
+sudo appbundle-updater chefdk chef master
 ```
 
-For Windows distros from PowerShell:
+Updating chef-dk in the /opt/chefdk bundle to master (sorry about the inconsistent dashes here
+but the project/gem is called "chef-dk" while the path on the filesystem is /opt/chefdk, the
+path on the filesystem comes first):
+
+```
+sudo appbundle-updater chefdk chef-dk master
+```
+
+Updating various other softwares in /opt/chefdk bundle to master:
+
+```
+sudo appbundle-updater chefdk berkshelf master
+sudo appbundle-updater chefdk chef-vault master
+sudo appbundle-updater chefdk ohai master
+sudo appbundle-updater chefdk foodcritic master
+sudo appbundle-updater chefdk test-kitchen master
+```
+
+Updating chef and ohai in the /opt/chef bundle to master:
+
+```
+sudo appbundle-updater chef chef master
+sudo appbundle-updater chef ohai master
+```
+
+Windows users from PowerShell use the bat file:
 
 ```powershell
-& bin\chefdk-update-app.bat --help
+& appbundle-updater chefdk test-kitchen master
 ```
 
-Choose a Git reference to update your app to. This could be a branch name, tag, SHA hash, or even `"master"`.
+If you don't want "master" you can use any other git tag/branch/sha/etc that git understands.
 
-Run it!
+## Execution and Target rubies
 
-For example, to update the `"test-kitchen"` app to release `"v1.4.0.beta.2"` (note that this project puts a `"v"` in front of release tags),
+This does not need to be installed into the embedded ruby that you are doing the update on.
 
-For Unix distros:
+You can install this into an rvm gemset as a local user (for example) and run:
 
-```sh
-sudo -E ./bin/chefdk-update-app.sh test-kitchen -r v1.4.0.beta.2
+```
+rvmsudo appbundle-updater chef chef master
 ```
 
-For Windows distros from PowerShell:
+It will invoke appbundle-updater via rvm (using your user ruby+gemset under sudo), but will
+correctly break the bundle and setup the PATH in order to manipulate your /opt/chefdk or
+/opt/chef ruby environment.
 
-```powershell
-& bin\chefdk-update-app.bat test-kitchen -r v1.4.0.beta.2
-```
+Only tested with RVM, but chruby and rbenv are usually simpler and easier.
 
 ## <a name="development"></a> Development
 
