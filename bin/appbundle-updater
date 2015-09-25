@@ -19,6 +19,11 @@
 
 require "pathname"
 require "optparse"
+require "open-uri"
+require "fileutils"
+require "rubygems/package"
+require "zlib"
+require "tempfile"
 
 # FIXME: move to helpers mixin
 
@@ -38,7 +43,39 @@ def bin_dir
   chefdk.join("embedded/bin")
 end
 
-App = Struct.new(:name, :url, :bundle_without, :install_command) do
+TAR_LONGLINK = '././@LongLink'
+
+# pure ruby `tar xzf`, handles longlinks and directories ending in '/'
+# (http://stackoverflow.com/a/31310593/506908)
+def extract_tgz(file, destination = '.')
+  Gem::Package::TarReader.new( Zlib::GzipReader.open file ) do |tar|
+    dest = nil
+    tar.each do |entry|
+      if entry.full_name == TAR_LONGLINK
+        dest = File.join destination, entry.read.strip
+        next
+      end
+      dest ||= File.join destination, entry.full_name
+      if entry.directory? || (entry.header.typeflag == '' && entry.full_name.end_with?('/'))
+        File.delete dest if File.file? dest
+        FileUtils.mkdir_p dest, :mode => entry.header.mode, :verbose => false
+      elsif entry.file? || (entry.header.typeflag == '' && !entry.full_name.end_with?('/'))
+        FileUtils.rm_rf dest if File.directory? dest
+        File.open dest, "wb" do |f|
+          f.print entry.read
+        end
+        FileUtils.chmod entry.header.mode, dest, :verbose => false
+      elsif entry.header.typeflag == '2' #Symlink!
+        File.symlink entry.header.linkname, dest
+      else
+        puts "Unkown tar entry: #{entry.full_name} type: #{entry.header.typeflag}."
+      end
+      dest = nil
+    end
+  end
+end
+
+App = Struct.new(:name, :repo, :bundle_without, :install_command) do
   def to_s
     name
   end
@@ -47,43 +84,43 @@ end
 CHEFDK_APPS = [
   App.new(
     "berkshelf",
-    "https://github.com/berkshelf/berkshelf.git",
+    "berkshelf/berkshelf",
     "guard test",
     "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "chef",
-    "https://github.com/chef/chef.git",
+    "chef/chef",
     "server docgen test development",
     "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "chef-dk",
-    "https://github.com/chef/chef-dk.git",
+    "chef/chef-dk",
     "dev test development",
     "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "chef-vault",
-    "https://github.com/Nordstrom/chef-vault.git",
+    "Nordstrom/chef-vault",
     "test",
     "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "foodcritic",
-    "https://github.com/acrmp/foodcritic.git",
+    "acrmp/foodcritic",
     nil,
     "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "ohai",
-    "https://github.com/chef/ohai.git",
+    "chef/ohai",
     "test development",
     "#{bin_dir.join("rake")} install",
   ),
   App.new(
     "test-kitchen",
-    "https://github.com/test-kitchen/test-kitchen.git",
+    "test-kitchen/test-kitchen",
     "guard test",
     "#{bin_dir.join("rake")} install",
   )
@@ -106,12 +143,18 @@ class Updater
     banner("Cleaning #{app} checkout")
     app_dir.rmtree if app_dir.directory?
 
-    banner("Cloning #{app} from #{app.url}")
-    run("git clone #{app.url} #{app_dir}")
-
-    banner("Checking out #{app} to #{ref}")
-    Dir.chdir(app_dir) do
-      run("git checkout #{ref}")
+    git_url = "https://github.com/#{app.repo}/archive/#{ref}.tar.gz"
+    banner("Extracting #{app} from #{git_url}")
+    Dir.chdir(chefdk.join("embedded/apps")) do
+      Tempfile.open('appbundle-updater') do |tempfile|
+        open(git_url) do |uri|
+          tempfile.write(uri.read)
+        end
+        tempfile.close
+        extract_tgz(tempfile.path)
+      end
+      base = File.basename app.repo
+      FileUtils.mv "#{base}-#{ref}", "#{app.name}"
     end
 
     banner("Installing dependencies")
